@@ -191,12 +191,8 @@ function captureHeaders() {
     }) || 1;
   }
 
-  const displayName = getAccountNameFromPayload(JSON.stringify({
-    nickname: picked["X-NS-User"] || picked["X-User-Name"] || picked["X-Account-Name"] || ""
-  }), "");
-
-  if (writeAccount(slot, picked, displayName)) {
-    const savedName = normalizeNotifyName(readAccountName(slot), accountLabel(slot));
+  if (writeAccount(slot, picked, "")) {
+    const savedName = accountLabel(slot);
     console.log(`[NS] saved picked headers for ${savedName}: ${JSON.stringify(picked)}`);
     notify(TITLE, "获取成功", `已保存当前${savedName}的cookie和header`);
   } else {
