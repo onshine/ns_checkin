@@ -37,6 +37,16 @@ function nowString() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+function readJSON(key) {
+  const raw = $prefs.valueForKey(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
 function saveAccount(slot, value) {
   return $prefs.setValueForKey(JSON.stringify(value), accountKey(slot));
 }
@@ -90,7 +100,7 @@ function sendTelegram(title, lines, callback) {
     .concat(lines.map((line) => `- ${escapeMarkdownV2(line)}`))
     .join("\n");
 
-  $task.fetch({
+  fetchWithTimeout({
     url: `https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`,
     method: "POST",
     headers: {
@@ -102,17 +112,36 @@ function sendTelegram(title, lines, callback) {
       parse_mode: "MarkdownV2",
       disable_web_page_preview: true
     })
-  }).then(
-    () => callback && callback(),
-    (error) => {
+  }, 15000, (_response, error) => {
+    if (error) {
       console.log(`[NS] TG push error: ${error}`);
-      callback && callback();
     }
-  );
+    callback && callback();
+  });
 }
 
-function notify(title, subtitle, body) {
-  $notify(title, subtitle, body);
+function fetchWithTimeout(options, timeoutMs, callback) {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    callback(null, `请求超时(${timeoutMs}ms)`);
+  }, timeoutMs);
+
+  $task.fetch(options).then(
+    (response) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(response, null);
+    },
+    (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(null, error);
+    }
+  );
 }
 
 function buildHeaders(savedHeaders) {
@@ -194,6 +223,9 @@ function captureHeaders() {
   if (writeAccount(slot, picked, "")) {
     const savedName = accountLabel(slot);
     console.log(`[NS] saved picked headers for ${savedName}: ${JSON.stringify(picked)}`);
+    if (slot === 1) {
+      $prefs.setValueForKey(JSON.stringify(picked), NS_HEADER_KEY);
+    }
     notify(TITLE, "获取成功", `已保存当前${savedName}的cookie和header`);
   } else {
     notify(TITLE, "保存失败", "写入持久化存储失败，请检查配置");
@@ -310,7 +342,7 @@ function checkinOne(account, done) {
 
   validateSession(account.savedHeaders, (validation) => {
     if (!validation.valid) {
-      const subtitle = `${label} Cookie 无效`;
+      const subtitle = `${label}Cookie无效`;
       const body = validation.message;
       notify(TITLE, subtitle, body);
       done({
@@ -322,56 +354,56 @@ function checkinOne(account, done) {
       return;
     }
 
-    $task.fetch({
+    fetchWithTimeout({
       url: "https://www.nodeseek.com/api/attendance?random=true",
       method: "POST",
       headers,
       body: ""
-    }).then(
-      (response) => {
-        const status = response.statusCode || response.status || 0;
-        let msg = response.body || "无返回内容";
-
-        try {
-          const parsed = JSON.parse(response.body);
-          msg = parsed.message || msg;
-        } catch (e) {}
-
-        console.log(`[NS签到] ${label} | 状态码: ${status} | 响应内容: ${msg}`);
-
-        let subtitle = `${label} ${status} 异常`;
-        if (status >= 200 && status < 300) {
-          subtitle = `${label} 签到成功 🍗`;
-          notify(TITLE, subtitle, msg);
-        } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
-          subtitle = `${label} 今日已签到 🍗`;
-          notify(TITLE, subtitle, "今天已经领过鸡腿啦，明天再来吧~");
-        } else if (status === 403) {
-          subtitle = `${label} 403 风控`;
-          notify(TITLE, subtitle, `暂时被风控，稍后再试\n内容：${msg}`);
-        } else {
-          notify(TITLE, subtitle, msg);
-        }
-
-        done({
-          label,
-          ok: status >= 200 && status < 300,
-          subtitle,
-          message: msg,
-          status
-        });
-      },
-      (error) => {
-        console.log(`[NS签到] ${label} request error: ${error}`);
-        notify(TITLE, `${label} 请求错误`, String(error));
+    }, 20000, (response, fetchError) => {
+      if (fetchError) {
+        console.log(`[NS签到] ${label} request error: ${fetchError}`);
+        notify(TITLE, `${label} 请求错误`, String(fetchError));
         done({
           label,
           ok: false,
           subtitle: "请求错误",
-          message: String(error)
+          message: String(fetchError)
         });
+        return;
       }
-    );
+
+      const status = response.statusCode || response.status || 0;
+      let msg = response.body || "无返回内容";
+
+      try {
+        const parsed = JSON.parse(response.body);
+        msg = parsed.message || msg;
+      } catch (e) {}
+
+      console.log(`[NS签到] ${label} | 状态码: ${status} | 响应内容: ${msg}`);
+
+      let subtitle = `${label} ${status} 异常`;
+      if (status >= 200 && status < 300) {
+        subtitle = `${label} 签到成功 🍗`;
+        notify(TITLE, subtitle, msg);
+      } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
+        subtitle = `${label} 今日已签到 🍗`;
+        notify(TITLE, subtitle, "今天已经领过鸡腿啦，明天再来吧~");
+      } else if (status === 403) {
+        subtitle = `${label} 403 风控`;
+        notify(TITLE, subtitle, `暂时被风控，稍后再试\n内容：${msg}`);
+      } else {
+        notify(TITLE, subtitle, msg);
+      }
+
+      done({
+        label,
+        ok: status >= 200 && status < 300,
+        subtitle,
+        message: msg,
+        status
+      });
+    });
   });
 }
 
