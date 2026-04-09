@@ -419,6 +419,9 @@ function checkinOne(account, done) {
 function loadAccounts() {
   const accounts = [];
   const seenCookies = new Set();
+  let filledSlots = 0;
+  let duplicateCookies = 0;
+  const savedSlots = [];
 
   for (const slot of ACCOUNT_SLOTS) {
     const account = readAccount(slot);
@@ -428,7 +431,15 @@ function loadAccounts() {
     if (!savedHeaders) continue;
 
     const cookie = String(savedHeaders["Cookie"] || "").trim();
-    if (!cookie || seenCookies.has(cookie)) continue;
+    if (!cookie) continue;
+
+    filledSlots += 1;
+    savedSlots.push(slot);
+
+    if (seenCookies.has(cookie)) {
+      duplicateCookies += 1;
+      continue;
+    }
     seenCookies.add(cookie);
 
     accounts.push({
@@ -446,9 +457,15 @@ function loadAccounts() {
         label: accountLabel(1),
         savedHeaders: legacy
       });
+      filledSlots = Math.max(filledSlots, 1);
+      if (savedSlots.indexOf(1) === -1) savedSlots.push(1);
     }
   }
 
+  accounts.slotCount = ACCOUNT_SLOTS.length;
+  accounts.filledSlots = filledSlots;
+  accounts.duplicateCookies = duplicateCookies;
+  accounts.savedSlots = savedSlots;
   return accounts;
 }
 
@@ -460,7 +477,8 @@ function doCheckin() {
     return;
   }
 
-  notify(TITLE, "开始签到", `共${accounts.length}个账号，按顺序执行`);
+  const slotInfo = `配置槽位${accounts.slotCount}个，已保存${accounts.filledSlots}个，实际去重后${accounts.length}个${accounts.duplicateCookies > 0 ? `，发现${accounts.duplicateCookies}个重复cookie` : ""}`;
+  notify(TITLE, "本地账号读取", slotInfo);
 
   const results = [];
   const runNext = (index) => {
