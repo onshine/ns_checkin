@@ -345,13 +345,13 @@ function checkinOne(account, done) {
   const headers = buildHeaders(account.savedHeaders);
   const label = account.label;
 
-  notify(TITLE, `${label} 开始`, `开始处理 ${label}`);
+  console.log(`[NS签到] 开始处理 ${label}`);
 
   validateSession(account.savedHeaders, (validation) => {
     if (!validation.valid) {
       const subtitle = `${label}Cookie无效`;
       const body = validation.message;
-      notify(TITLE, subtitle, body);
+      console.log(`[NS签到] ${label} 验证失败：${body}`);
       done({
         label,
         ok: false,
@@ -361,8 +361,6 @@ function checkinOne(account, done) {
       return;
     }
 
-    notify(TITLE, `${label} 50%`, `${label} Cookie 有效，开始签到`);
-
     fetchWithTimeout({
       url: "https://www.nodeseek.com/api/attendance?random=true",
       method: "POST",
@@ -371,7 +369,6 @@ function checkinOne(account, done) {
     }, 20000, (response, fetchError) => {
       if (fetchError) {
         console.log(`[NS签到] ${label} request error: ${fetchError}`);
-        notify(TITLE, `${label} 失败`, String(fetchError));
         done({
           label,
           ok: false,
@@ -394,15 +391,12 @@ function checkinOne(account, done) {
       let subtitle = `${label} ${status} 异常`;
       if (status >= 200 && status < 300) {
         subtitle = `${label} 签到成功 🍗`;
-        notify(TITLE, `${label} 100%`, `${subtitle}\n${msg}`);
       } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
         subtitle = `${label} 今日已签到 🍗`;
-        notify(TITLE, `${label} 100%`, `${subtitle}\n今天已经领过鸡腿啦，明天再来吧~`);
+        msg = "今天已经领过鸡腿啦，明天再来吧~";
       } else if (status === 403) {
         subtitle = `${label} 403 风控`;
-        notify(TITLE, `${label} 100%`, `${subtitle}\n暂时被风控，稍后再试\n内容：${msg}`);
-      } else {
-        notify(TITLE, `${label} 100%`, `${subtitle}\n${msg}`);
+        msg = `暂时被风控，稍后再试\n内容：${msg}`;
       }
 
       done({
@@ -440,8 +434,8 @@ function loadAccounts() {
       duplicateCookies += 1;
       continue;
     }
-    seenCookies.add(cookie);
 
+    seenCookies.add(cookie);
     accounts.push({
       slot,
       label: accountLabel(slot),
@@ -458,7 +452,7 @@ function loadAccounts() {
         savedHeaders: legacy
       });
       filledSlots = Math.max(filledSlots, 1);
-      if (savedSlots.indexOf(1) === -1) savedSlots.push(1);
+      if (!savedSlots.includes(1)) savedSlots.push(1);
     }
   }
 
@@ -481,6 +475,7 @@ function doCheckin() {
   notify(TITLE, "本地账号读取", slotInfo);
 
   const results = [];
+  const total = accounts.length;
   const runNext = (index) => {
     if (index >= accounts.length) {
       const summaryLines = results.map((item) => `${item.label}：${item.subtitle}${item.message ? ` / ${item.message}` : ""}`);
@@ -496,13 +491,12 @@ function doCheckin() {
     }
 
     const account = accounts[index];
-    const progress = Math.max(1, Math.floor((index / accounts.length) * 100));
-    notify(TITLE, `${account.label} ${progress}%`, `开始处理 ${account.label}`);
+    console.log(`[NS签到] 处理进度 ${index + 1}/${total} -> ${account.label}`);
 
     checkinOne(account, (result) => {
       results.push(result);
-      const doneProgress = Math.floor(((index + 1) / accounts.length) * 100);
-      notify(TITLE, `${account.label} ${doneProgress}%`, `${account.label} 已处理：${result.subtitle}`);
+      const progressText = `${index + 1}/${total}`;
+      notify(TITLE, `${account.label} ${progressText}`, `${result.subtitle}${result.message ? ` / ${result.message}` : ""}`);
       runNext(index + 1);
     });
   };
