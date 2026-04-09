@@ -211,18 +211,44 @@ function captureHeaders() {
   }
 
   const cookie = String(picked["Cookie"] || "").trim();
-  let slot = ACCOUNT_SLOTS.find((item) => {
-    const saved = readAccount(item);
-    const savedCookie = String((saved && saved.headers && saved.headers["Cookie"]) || saved && saved["Cookie"] || "").trim();
-    return savedCookie && savedCookie === cookie;
-  });
+  const slot1 = readAccount(1);
+  const slot2 = readAccount(2);
+  const slot1Headers = readAccountHeaders(1);
+  const slot2Headers = readAccountHeaders(2);
+  const slot1Cookie = String((slot1Headers && slot1Headers["Cookie"]) || "").trim();
+  const slot2Cookie = String((slot2Headers && slot2Headers["Cookie"]) || "").trim();
 
-  if (!slot) {
-    slot = ACCOUNT_SLOTS.find((item) => {
-      const saved = readAccount(item);
-      const savedCookie = String((saved && saved.headers && saved.headers["Cookie"]) || saved && saved["Cookie"] || "").trim();
-      return !savedCookie;
-    }) || 1;
+  let slot = 0;
+
+  if (!slot1 || !slot1Cookie) {
+    slot = 1;
+  } else if (!slot2 || !slot2Cookie) {
+    const slot1HeadersText = JSON.stringify(slot1Headers || {});
+    const pickedHeadersText = JSON.stringify(picked || {});
+    if (cookie && cookie !== slot1Cookie) {
+      slot = 2;
+    } else if (pickedHeadersText !== slot1HeadersText) {
+      slot = 2;
+    } else {
+      slot = 1;
+    }
+  } else {
+    const slot1HeadersText = JSON.stringify(slot1Headers || {});
+    const slot2HeadersText = JSON.stringify(slot2Headers || {});
+    const pickedHeadersText = JSON.stringify(picked || {});
+    if (cookie && cookie !== slot1Cookie && cookie !== slot2Cookie) {
+      slot = 2;
+    } else if (pickedHeadersText === slot1HeadersText) {
+      slot = 1;
+    } else if (pickedHeadersText === slot2HeadersText) {
+      slot = 2;
+    } else {
+      slot = 2;
+    }
+  }
+
+  if (slot === 0) {
+    slot = 1;
   }
 
   if (writeAccount(slot, picked, "")) {
