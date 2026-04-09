@@ -299,46 +299,48 @@ function validateSession(savedHeaders, callback) {
     return;
   }
 
-  $task.fetch({
+  fetchWithTimeout({
     url: validateUrl,
     method: "GET",
     headers: buildHeaders(savedHeaders)
-  }).then(
-    (response) => {
-      const status = response.statusCode || response.status || 0;
-      const body = response.body || "";
-      let msg = body || "";
-      let displayName = "";
-
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed && typeof parsed.message === "string") msg = parsed.message;
-        displayName = extractDisplayName(parsed);
-      } catch (e) {}
-
-      const invalidKeywords = ["请先登录", "未登录", "登录", "Unauthorized", "401", "403"];
-      const bodyText = String(body || "");
-      const invalid = status >= 400 || invalidKeywords.some((kw) => bodyText.includes(kw) || String(msg).includes(kw));
-
-      callback({
-        valid: !invalid,
-        message: invalid ? `Cookie 可能失效：HTTP ${status} / ${msg}` : "Cookie 有效",
-        displayName
-      });
-    },
-    (error) => {
+  }, 15000, (response, error) => {
+    if (error) {
       callback({
         valid: false,
         message: `Cookie 校验请求失败：${error}`,
         displayName: ""
       });
+      return;
     }
-  );
+
+    const status = response.statusCode || response.status || 0;
+    const body = response.body || "";
+    let msg = body || "";
+    let displayName = "";
+
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed.message === "string") msg = parsed.message;
+      displayName = extractDisplayName(parsed);
+    } catch (e) {}
+
+    const invalidKeywords = ["请先登录", "未登录", "登录", "Unauthorized", "401", "403"];
+    const bodyText = String(body || "");
+    const invalid = status >= 400 || invalidKeywords.some((kw) => bodyText.includes(kw) || String(msg).includes(kw));
+
+    callback({
+      valid: !invalid,
+      message: invalid ? `Cookie 可能失效：HTTP ${status} / ${msg}` : "Cookie 有效",
+      displayName
+    });
+  });
 }
 
 function checkinOne(account, done) {
   const headers = buildHeaders(account.savedHeaders);
   const label = account.label;
+
+  notify(TITLE, `${label} 开始`, `开始处理 ${label}`);
 
   validateSession(account.savedHeaders, (validation) => {
     if (!validation.valid) {
@@ -354,6 +356,8 @@ function checkinOne(account, done) {
       return;
     }
 
+    notify(TITLE, `${label} 50%`, `${label} Cookie 有效，开始签到`);
+
     fetchWithTimeout({
       url: "https://www.nodeseek.com/api/attendance?random=true",
       method: "POST",
@@ -362,7 +366,7 @@ function checkinOne(account, done) {
     }, 20000, (response, fetchError) => {
       if (fetchError) {
         console.log(`[NS签到] ${label} request error: ${fetchError}`);
-        notify(TITLE, `${label} 请求错误`, String(fetchError));
+        notify(TITLE, `${label} 失败`, String(fetchError));
         done({
           label,
           ok: false,
@@ -385,15 +389,15 @@ function checkinOne(account, done) {
       let subtitle = `${label} ${status} 异常`;
       if (status >= 200 && status < 300) {
         subtitle = `${label} 签到成功 🍗`;
-        notify(TITLE, subtitle, msg);
+        notify(TITLE, `${label} 100%`, `${subtitle}\n${msg}`);
       } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
         subtitle = `${label} 今日已签到 🍗`;
-        notify(TITLE, subtitle, "今天已经领过鸡腿啦，明天再来吧~");
+        notify(TITLE, `${label} 100%`, `${subtitle}\n今天已经领过鸡腿啦，明天再来吧~`);
       } else if (status === 403) {
         subtitle = `${label} 403 风控`;
-        notify(TITLE, subtitle, `暂时被风控，稍后再试\n内容：${msg}`);
+        notify(TITLE, `${label} 100%`, `${subtitle}\n暂时被风控，稍后再试\n内容：${msg}`);
       } else {
-        notify(TITLE, subtitle, msg);
+        notify(TITLE, `${label} 100%`, `${subtitle}\n${msg}`);
       }
 
       done({
@@ -451,6 +455,8 @@ function doCheckin() {
     return;
   }
 
+  notify(TITLE, "开始签到", `共${accounts.length}个账号，按顺序执行`);
+
   const results = [];
   const runNext = (index) => {
     if (index >= accounts.length) {
@@ -459,12 +465,21 @@ function doCheckin() {
         `时间：${nowString()}`,
         `账户数：${results.length}`,
         ...summaryLines
-      ], () => $done());
+      ], () => {
+        notify(TITLE, "签到完成", `已处理${results.length}个账号`);
+        $done();
+      });
       return;
     }
 
-    checkinOne(accounts[index], (result) => {
+    const account = accounts[index];
+    const progress = Math.max(1, Math.floor((index / accounts.length) * 100));
+    notify(TITLE, `${account.label} ${progress}%`, `开始处理 ${account.label}`);
+
+    checkinOne(account, (result) => {
       results.push(result);
+      const doneProgress = Math.floor(((index + 1) / accounts.length) * 100);
+      notify(TITLE, `${account.label} ${doneProgress}%`, `${account.label} 已处理：${result.subtitle}`);
       runNext(index + 1);
     });
   };
