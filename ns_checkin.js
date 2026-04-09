@@ -310,17 +310,15 @@ function validateSession(savedHeaders, callback) {
 
 function checkinOne(account, done) {
   const headers = buildHeaders(account.savedHeaders);
-  const label = normalizeNotifyName(account.displayName, account.label);
+  const label = account.label;
 
   validateSession(account.savedHeaders, (validation) => {
-    const validatedName = normalizeNotifyName(validation.displayName, label);
-
     if (!validation.valid) {
-      const subtitle = `${validatedName} Cookie 无效`;
+      const subtitle = `${label} Cookie 无效`;
       const body = validation.message;
       notify(TITLE, subtitle, body);
       done({
-        label: validatedName,
+        label,
         ok: false,
         subtitle,
         message: validation.message
@@ -343,24 +341,24 @@ function checkinOne(account, done) {
           msg = parsed.message || msg;
         } catch (e) {}
 
-        console.log(`[NS签到] ${validatedName} | 状态码: ${status} | 响应内容: ${msg}`);
+        console.log(`[NS签到] ${label} | 状态码: ${status} | 响应内容: ${msg}`);
 
-        let subtitle = `${validatedName} ${status} 异常`;
+        let subtitle = `${label} ${status} 异常`;
         if (status >= 200 && status < 300) {
-          subtitle = `${validatedName} 签到成功 🍗`;
+          subtitle = `${label} 签到成功 🍗`;
           notify(TITLE, subtitle, msg);
         } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
-          subtitle = `${validatedName} 今日已签到 🍗`;
+          subtitle = `${label} 今日已签到 🍗`;
           notify(TITLE, subtitle, "今天已经领过鸡腿啦，明天再来吧~");
         } else if (status === 403) {
-          subtitle = `${validatedName} 403 风控`;
+          subtitle = `${label} 403 风控`;
           notify(TITLE, subtitle, `暂时被风控，稍后再试\n内容：${msg}`);
         } else {
           notify(TITLE, subtitle, msg);
         }
 
         done({
-          label: validatedName,
+          label,
           ok: status >= 200 && status < 300,
           subtitle,
           message: msg,
@@ -368,10 +366,10 @@ function checkinOne(account, done) {
         });
       },
       (error) => {
-        console.log(`[NS签到] ${validatedName} request error: ${error}`);
-        notify(TITLE, `${validatedName} 请求错误`, String(error));
+        console.log(`[NS签到] ${label} request error: ${error}`);
+        notify(TITLE, `${label} 请求错误`, String(error));
         done({
-          label: validatedName,
+          label,
           ok: false,
           subtitle: "请求错误",
           message: String(error)
@@ -399,7 +397,6 @@ function loadAccounts() {
     accounts.push({
       slot,
       label: accountLabel(slot),
-      displayName: readAccountName(slot),
       savedHeaders
     });
   }
@@ -410,7 +407,6 @@ function loadAccounts() {
       accounts.push({
         slot: 1,
         label: accountLabel(1),
-        displayName: "",
         savedHeaders: legacy
       });
     }
