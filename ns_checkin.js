@@ -37,18 +37,39 @@ function nowString() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function saveJSON(key, value) {
-  return $prefs.setValueForKey(JSON.stringify(value), key);
+function saveAccount(slot, value) {
+  return $prefs.setValueForKey(JSON.stringify(value), accountKey(slot));
 }
 
-function readJSON(key) {
-  const raw = $prefs.valueForKey(key);
+function readAccount(slot) {
+  const raw = $prefs.valueForKey(accountKey(slot));
   if (!raw) return null;
   try {
     return JSON.parse(raw);
   } catch (e) {
     return null;
   }
+}
+
+function readAccountHeaders(slot) {
+  const account = readAccount(slot);
+  if (!account) return null;
+  if (account && account.headers && typeof account.headers === "object") return account.headers;
+  return account;
+}
+
+function readAccountName(slot) {
+  const account = readAccount(slot);
+  if (!account) return "";
+  return String(account.displayName || account.name || "").trim();
+}
+
+function writeAccount(slot, headers, displayName) {
+  return saveAccount(slot, {
+    headers,
+    displayName: String(displayName || "").trim(),
+    updatedAt: nowString()
+  });
 }
 
 function accountKey(slot) {
@@ -157,20 +178,27 @@ function captureHeaders() {
 
   const cookie = String(picked["Cookie"] || "").trim();
   let slot = ACCOUNT_SLOTS.find((item) => {
-    const saved = readJSON(accountKey(item));
-    return saved && String(saved["Cookie"] || "").trim() === cookie;
+    const saved = readAccount(item);
+    const savedCookie = String((saved && saved.headers && saved.headers["Cookie"]) || saved && saved["Cookie"] || "").trim();
+    return savedCookie && savedCookie === cookie;
   });
 
   if (!slot) {
     slot = ACCOUNT_SLOTS.find((item) => {
-      const saved = readJSON(accountKey(item));
-      return !saved || !String(saved["Cookie"] || "").trim();
+      const saved = readAccount(item);
+      const savedCookie = String((saved && saved.headers && saved.headers["Cookie"]) || saved && saved["Cookie"] || "").trim();
+      return !savedCookie;
     }) || 1;
   }
 
-  if (saveJSON(accountKey(slot), picked)) {
-    console.log(`[NS] saved picked headers for ${accountLabel(slot)}: ${JSON.stringify(picked)}`);
-    notify(TITLE, "获取成功", `已保存当前${accountLabel(slot)}的cookie和header`);
+  const displayName = getAccountNameFromPayload(JSON.stringify({
+    nickname: picked["X-NS-User"] || picked["X-User-Name"] || picked["X-Account-Name"] || ""
+  }), "");
+
+  if (writeAccount(slot, picked, displayName)) {
+    const savedName = normalizeNotifyName(readAccountName(slot), accountLabel(slot));
+    console.log(`[NS] saved picked headers for ${savedName}: ${JSON.stringify(picked)}`);
+    notify(TITLE, "获取成功", `已保存当前${savedName}的cookie和header`);
   } else {
     notify(TITLE, "保存失败", "写入持久化存储失败，请检查配置");
   }
@@ -178,12 +206,68 @@ function captureHeaders() {
   $done({});
 }
 
+function extractDisplayName(payload) {
+  const candidates = [];
+
+  const pushValue = (value) => {
+    if (typeof value === "string" && value.trim()) candidates.push(value.trim());
+  };
+
+  if (payload && typeof payload === "object") {
+    pushValue(payload.nickname);
+    pushValue(payload.nickName);
+    pushValue(payload.username);
+    pushValue(payload.userName);
+    pushValue(payload.name);
+    pushValue(payload.accountName);
+    pushValue(payload.displayName);
+    if (payload.data && typeof payload.data === "object") {
+      pushValue(payload.data.nickname);
+      pushValue(payload.data.nickName);
+      pushValue(payload.data.username);
+      pushValue(payload.data.userName);
+      pushValue(payload.data.name);
+      pushValue(payload.data.accountName);
+      pushValue(payload.data.displayName);
+    }
+    if (payload.user && typeof payload.user === "object") {
+      pushValue(payload.user.nickname);
+      pushValue(payload.user.nickName);
+      pushValue(payload.user.username);
+      pushValue(payload.user.userName);
+      pushValue(payload.user.name);
+      pushValue(payload.user.accountName);
+      pushValue(payload.user.displayName);
+    }
+  }
+
+  return candidates.length > 0 ? candidates[0] : "";
+}
+
+function parseAccountNameFromResponse(body, fallback) {
+  try {
+    const parsed = JSON.parse(body);
+    return extractDisplayName(parsed) || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function normalizeNotifyName(name, fallback) {
+  const value = String(name || "").trim();
+  return value || fallback;
+}
+
 function validateSession(savedHeaders, callback) {
   const validateUrl = $prefs.valueForKey(NS_VALIDATE_URL_KEY);
 
   if (!validateUrl) {
     const hasCookie = !!String(savedHeaders["Cookie"] || "").trim();
-    callback(hasCookie, hasCookie ? "本地 Cookie 已保存" : "本地 Cookie 为空");
+    callback({
+      valid: hasCookie,
+      message: hasCookie ? "本地 Cookie 已保存" : "本地 Cookie 为空",
+      displayName: ""
+    });
     return;
   }
 
@@ -196,37 +280,50 @@ function validateSession(savedHeaders, callback) {
       const status = response.statusCode || response.status || 0;
       const body = response.body || "";
       let msg = body || "";
+      let displayName = "";
 
       try {
         const parsed = JSON.parse(body);
         if (parsed && typeof parsed.message === "string") msg = parsed.message;
+        displayName = extractDisplayName(parsed);
       } catch (e) {}
 
       const invalidKeywords = ["请先登录", "未登录", "登录", "Unauthorized", "401", "403"];
       const bodyText = String(body || "");
       const invalid = status >= 400 || invalidKeywords.some((kw) => bodyText.includes(kw) || String(msg).includes(kw));
 
-      callback(!invalid, invalid ? `Cookie 可能失效：HTTP ${status} / ${msg}` : "Cookie 有效");
+      callback({
+        valid: !invalid,
+        message: invalid ? `Cookie 可能失效：HTTP ${status} / ${msg}` : "Cookie 有效",
+        displayName
+      });
     },
     (error) => {
-      callback(false, `Cookie 校验请求失败：${error}`);
+      callback({
+        valid: false,
+        message: `Cookie 校验请求失败：${error}`,
+        displayName: ""
+      });
     }
   );
 }
 
 function checkinOne(account, done) {
   const headers = buildHeaders(account.savedHeaders);
+  const label = normalizeNotifyName(account.displayName, account.label);
 
-  validateSession(account.savedHeaders, (valid, validateMsg) => {
-    if (!valid) {
-      const subtitle = `${account.label} Cookie 无效`;
-      const body = validateMsg;
+  validateSession(account.savedHeaders, (validation) => {
+    const validatedName = normalizeNotifyName(validation.displayName, label);
+
+    if (!validation.valid) {
+      const subtitle = `${validatedName} Cookie 无效`;
+      const body = validation.message;
       notify(TITLE, subtitle, body);
       done({
-        label: account.label,
+        label: validatedName,
         ok: false,
         subtitle,
-        message: validateMsg
+        message: validation.message
       });
       return;
     }
@@ -246,24 +343,24 @@ function checkinOne(account, done) {
           msg = parsed.message || msg;
         } catch (e) {}
 
-        console.log(`[NS签到] ${account.label} | 状态码: ${status} | 响应内容: ${msg}`);
+        console.log(`[NS签到] ${validatedName} | 状态码: ${status} | 响应内容: ${msg}`);
 
-        let subtitle = `${status} 异常`;
+        let subtitle = `${validatedName} ${status} 异常`;
         if (status >= 200 && status < 300) {
-          subtitle = "签到成功 🍗";
-          notify(TITLE, `${account.label} ${subtitle}`, msg);
+          subtitle = `${validatedName} 签到成功 🍗`;
+          notify(TITLE, subtitle, msg);
         } else if (status === 500 && (String(msg).includes("已完成签到") || String(msg).includes("重复操作"))) {
-          subtitle = "今日已签到 🍗";
-          notify(TITLE, `${account.label} ${subtitle}`, "今天已经领过鸡腿啦，明天再来吧~");
+          subtitle = `${validatedName} 今日已签到 🍗`;
+          notify(TITLE, subtitle, "今天已经领过鸡腿啦，明天再来吧~");
         } else if (status === 403) {
-          subtitle = "403 风控";
-          notify(TITLE, `${account.label} ${subtitle}`, `暂时被风控，稍后再试\n内容：${msg}`);
+          subtitle = `${validatedName} 403 风控`;
+          notify(TITLE, subtitle, `暂时被风控，稍后再试\n内容：${msg}`);
         } else {
-          notify(TITLE, `${account.label} ${subtitle}`, msg);
+          notify(TITLE, subtitle, msg);
         }
 
         done({
-          label: account.label,
+          label: validatedName,
           ok: status >= 200 && status < 300,
           subtitle,
           message: msg,
@@ -271,10 +368,10 @@ function checkinOne(account, done) {
         });
       },
       (error) => {
-        console.log(`[NS签到] ${account.label} request error: ${error}`);
-        notify(TITLE, `${account.label} 请求错误`, String(error));
+        console.log(`[NS签到] ${validatedName} request error: ${error}`);
+        notify(TITLE, `${validatedName} 请求错误`, String(error));
         done({
-          label: account.label,
+          label: validatedName,
           ok: false,
           subtitle: "请求错误",
           message: String(error)
@@ -289,20 +386,22 @@ function loadAccounts() {
   const seenCookies = new Set();
 
   for (const slot of ACCOUNT_SLOTS) {
-    const raw = $prefs.valueForKey(accountKey(slot));
-    if (!raw) continue;
+    const account = readAccount(slot);
+    if (!account) continue;
 
-    try {
-      const savedHeaders = JSON.parse(raw);
-      const cookie = String(savedHeaders["Cookie"] || "").trim();
-      if (!cookie || seenCookies.has(cookie)) continue;
-      seenCookies.add(cookie);
-      accounts.push({
-        slot,
-        label: accountLabel(slot),
-        savedHeaders
-      });
-    } catch (e) {}
+    const savedHeaders = readAccountHeaders(slot);
+    if (!savedHeaders) continue;
+
+    const cookie = String(savedHeaders["Cookie"] || "").trim();
+    if (!cookie || seenCookies.has(cookie)) continue;
+    seenCookies.add(cookie);
+
+    accounts.push({
+      slot,
+      label: accountLabel(slot),
+      displayName: readAccountName(slot),
+      savedHeaders
+    });
   }
 
   if (accounts.length === 0) {
@@ -311,6 +410,7 @@ function loadAccounts() {
       accounts.push({
         slot: 1,
         label: accountLabel(1),
+        displayName: "",
         savedHeaders: legacy
       });
     }
