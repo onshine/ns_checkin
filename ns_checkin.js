@@ -120,6 +120,10 @@ function sendTelegram(title, lines, callback) {
   });
 }
 
+function notify(title, subtitle, body) {
+  $notify(title, subtitle, body);
+}
+
 function fetchWithTimeout(options, timeoutMs, callback) {
   let settled = false;
   const timer = setTimeout(() => {
@@ -143,6 +147,7 @@ function fetchWithTimeout(options, timeoutMs, callback) {
     }
   );
 }
+
 
 function buildHeaders(savedHeaders) {
   return {
