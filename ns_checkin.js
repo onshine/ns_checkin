@@ -412,10 +412,10 @@ function checkinOne(account, done) {
 
 function loadAccounts() {
   const accounts = [];
-  const seenCookies = new Set();
   let filledSlots = 0;
   let duplicateCookies = 0;
   const savedSlots = [];
+  const seenCookies = new Set();
 
   for (const slot of ACCOUNT_SLOTS) {
     const account = readAccount(slot);
@@ -432,10 +432,10 @@ function loadAccounts() {
 
     if (seenCookies.has(cookie)) {
       duplicateCookies += 1;
-      continue;
+    } else {
+      seenCookies.add(cookie);
     }
 
-    seenCookies.add(cookie);
     accounts.push({
       slot,
       label: accountLabel(slot),
