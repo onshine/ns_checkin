@@ -1,54 +1,55 @@
 /**
- * V4.0 - 修复说明：
- * 1. 强制将请求方法锁定为 POST (解决 Cannot GET 错误)。
- * 2. 优化了 $httpClient.post 的参数结构。
- * 3. 增加了对请求头的校验提示，确保脚本不因无效 Header 报错。
+ * V5.0 - 参考社区稳定版逻辑
+ * 修复：强化请求头结构，增加超时处理，确保网络请求完整性。
+ * 功能：增加了 Referer 自动补全，防止服务器拒绝非法请求。
  */
 
 const NS_HEADER_KEY = "NS_NodeseekHeaders";
 const isGetHeader = typeof $request !== "undefined";
 
 if (isGetHeader) {
+  // 严格记录请求头
   const picked = $request.headers;
-  // 仅在获取到 Cookie 时才覆盖存储
   if (picked && picked.Cookie) {
     $persistentStore.write(JSON.stringify(picked), NS_HEADER_KEY);
-    $notification.post("NS签到 [V4.0]", "获取成功", "请求头已保存，请保持抓包状态刷新一次页面以确保 Header 有效。");
-  } else {
-    $notification.post("NS签到 [V4.0]", "获取失败", "未检测到有效的 Cookie。");
+    $notification.post("NS签到 [V5.0]", "Header 缓存成功", "请保持配置开启。");
   }
   $done({});
 } else {
   const raw = $persistentStore.read(NS_HEADER_KEY);
   if (!raw) {
-    $notification.post("NS签到 [V4.0]", "失败", "本地数据为空，请先访问个人信息页触发获取。");
+    $notification.post("NS签到 [V5.0]", "失败", "本地数据为空，请先触发抓包。");
     $done();
     return;
   }
 
   const savedHeaders = JSON.parse(raw);
   
-  // 必须是 POST 请求
+  // 核心：强制构造完整的 Referer，这往往是“网络错误”或 403 的根源
+  savedHeaders["Referer"] = "https://www.nodeseek.com/";
+  savedHeaders["Origin"] = "https://www.nodeseek.com";
+  savedHeaders["User-Agent"] = savedHeaders["User-Agent"] || "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
   const options = {
     url: "https://www.nodeseek.com/api/attendance",
     headers: savedHeaders,
-    body: "" // 签到接口目前不需要发送 JSON body
+    timeout: 10000, // 增加超时设置，防止网络连接不稳定导致报错
+    body: ""
   };
 
   $httpClient.post(options, (error, response, data) => {
     if (error) {
-      $notification.post("NS签到 [V4.0]", "网络错误", String(error));
+      console.log("NS签到网络错误详情: " + JSON.stringify(error));
+      $notification.post("NS签到 [V5.0]", "网络错误", "请检查网络环境或节点连通性。");
     } else {
       console.log("NS服务器响应状态: " + response.status);
-      console.log("NS服务器完整响应: " + data); // 持续保留原始响应以便调试
+      console.log("NS服务器响应体: " + data);
       
       try {
         const obj = JSON.parse(data);
-        const title = response.status === 200 ? "签到反馈" : "签到异常";
-        const msg = obj.message || JSON.stringify(obj);
-        $notification.post(`NS签到 [V4.0] (${response.status})`, "", String(msg));
+        $notification.post(`NS签到反馈 (${response.status})`, "", String(obj.message || "未知响应"));
       } catch (e) {
-        $notification.post(`NS签到 [V4.0] (${response.status})`, "数据解析失败", "服务器返回了非 JSON 内容，请检查日志。");
+        $notification.post("NS签到 [V5.0]", "解析错误", "服务器返回数据格式异常。");
       }
     }
     $done();
