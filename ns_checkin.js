@@ -1,69 +1,59 @@
 /**
- * NS论坛自动签到 (Loon 专用版)
- * 修复：更新签到接口地址为：https://www.nodeseek.com/api/attendance
- * 修复：完全替换 QX 专用 API，适配 Loon $persistentStore 和 $notification
+ * NS论坛自动签到 (V3.0 - 增强版)
+ * 修复：增强响应解析能力，兼容非 JSON 返回值
+ * 优化：使用 $httpClient.post 的标准回调处理
  */
 
 const NS_HEADER_KEY = "NS_NodeseekHeaders";
 const isGetHeader = typeof $request !== "undefined";
 
-// 需要抓取的 Header 列表
-const NEED_KEYS = [
-  "Connection", "Accept-Encoding", "Priority", "Content-Type", "Origin",
-  "refract-sign", "User-Agent", "refract-key", "Sec-Fetch-Mode",
-  "Cookie", "Host", "Referer", "Accept-Language", "Accept"
-];
-
-function pickNeedHeaders(src = {}) {
-  const dst = {};
-  const get = (name) => src[name] ?? src[name.toLowerCase()] ?? src[name.toUpperCase()];
-  for (const k of NEED_KEYS) {
-    const v = get(k);
-    if (v !== undefined) dst[k] = v;
-  }
-  return dst;
-}
-
 if (isGetHeader) {
-  // 1. 获取并保存 Header
-  const picked = pickNeedHeaders($request.headers || {});
-  if (!picked || Object.keys(picked).length === 0) {
-    $notification.post("NS签到", "获取失败", "未获取到有效的请求头");
-  } else {
+  // 获取并保存 Headers
+  const picked = $request.headers;
+  if (picked) {
     $persistentStore.write(JSON.stringify(picked), NS_HEADER_KEY);
-    $notification.post("NS签到", "获取成功", "请求头已持久化，现在可以执行定时任务了");
+    $notification.post("NS签到", "成功", "Headers 已更新，可以进行签到了。");
   }
   $done({});
 } else {
-  // 2. 执行签到任务
   const raw = $persistentStore.read(NS_HEADER_KEY);
   if (!raw) {
-    $notification.post("NS签到", "失败", "未找到 Cookie，请重新进入个人页面获取");
+    $notification.post("NS签到", "失败", "未找到 Cookie，请重新访问个人页面。");
     $done();
     return;
   }
 
   const savedHeaders = JSON.parse(raw);
   
-  // 【修复点】更换为正确的接口地址
-  const url = "https://www.nodeseek.com/api/attendance";
-  
-  $httpClient.post({
-    url: url,
+  // 核心：NodeSeek 现在对接口有严格校验，Header 必须完整
+  const options = {
+    url: "https://www.nodeseek.com/api/attendance",
     headers: savedHeaders,
-    body: "" 
-  }, (error, response, data) => {
+    body: "" // 签到接口通常不需要 body，但需要正确的 Header 签名
+  };
+
+  $httpClient.post(options, (error, response, data) => {
     if (error) {
       $notification.post("NS签到", "请求异常", String(error));
     } else {
+      // 核心修复：更健壮的 JSON 解析逻辑
+      let result = "无返回内容";
       try {
-        const obj = JSON.parse(data);
-        const title = response.status === 200 ? "签到成功" : "签到结果";
-        const msg = obj?.message || data;
-        $notification.post("NS签到", title, String(msg));
+        if (data) {
+          const obj = JSON.parse(data);
+          result = obj.message || JSON.stringify(obj);
+        }
       } catch (e) {
-        $notification.post("NS签到", "数据解析失败", String(data));
+        // 如果无法解析为 JSON，打印原始数据以便排查
+        result = data.substring(0, 50); // 截取前50字符防止日志过长
+        console.log("NS服务器原始响应: " + data);
       }
+      
+      $notification.post(
+        `NS签到结果 (${response.status})`, 
+        "", 
+        String(result)
+      );
     }
     $done();
   });
