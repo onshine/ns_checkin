@@ -88,7 +88,7 @@ http-request ^https:\/\/miao\.baidu\.com\/abdr tag=百度网盘 指纹, script-p
 cron "25 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/baidunetdisk/baidunetdisk.js, tag=百度网盘签到, enable={baidunetdisk}
 
 # 追觅签到
-http-request ^https:\/\/cn-wxmall\.dreame\.tech\/main\/ tag=追觅 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, requires-body=true, enable={dreame}
+http-request ^https:\/\/cn-wxmall\.dreame\.tech\/main\/my\/info tag=追觅 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, requires-body=true, enable={dreame}
 cron "30 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, tag=追觅签到, enable={dreame}
 
 # 灵狐灵购
