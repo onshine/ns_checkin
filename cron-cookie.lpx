@@ -12,6 +12,7 @@ nodeseek = switch,false,tag=NODESEEK(WEB·测试中),desc=NODESEEK网页签到
 camscanner = switch,false,tag=扫描全能王(App·测试中),desc=打开「扫描全能王」APP → 任意页面停留几秒(自动触发 get_user_attribute)
 baidunetdisk = switch,false,tag=百度网盘(App·测试中),desc=打开百度网盘 APP →「我的」→ 进入「签到」页面,停留 1 秒
 dreame = switch,false,tag=追觅(App·测试中),desc=打开追觅 APP → 进入「商城」或「我的」页面,触发 my/info
+linghu = switch,false,tag=灵狐灵购(App·测试中),desc=打开灵狐灵购 APP → 进入「商城」或「我的」页面,触发 my/info
 ppmt = switch,false,tag=泡泡玛特,desc=打开泡泡玛特小程序进会员页触发(详见 README)
 tuhu = switch,false,tag=途虎养车,desc=打开途虎养车小程序进签到页触发(详见 README)
 haidilao = switch,false,tag=海底捞,desc=打开海底捞小程序进签到页触发(详见 README)
@@ -41,76 +42,80 @@ lvcchong_app = switch,false,tag=驴充充(App·已归档),desc=驴充充 App 版
 
 
 [MITM]
-hostname = popvip.paquapp.com, api.tuhu.cn, superapp-public.kiwa-tech.com, media.meituan.com, member-center.miniso.com, a.china-smartech.com, gw2c-hw-open.longfor.com, xapi.weimob.com, scrm-b.zjian.net, sgi.teld.cc, api.weibo.cn, bbs-api.miyoushe.com, pbaccess.video.qq.com, app.mixcapp.com, shop-api.retail.mi.com, m.xiaomiyoupin.com, user-api-prd-mx.wandafilm.com, u6.y.qq.com, discount.wxpapp.wechatpay.cn, mini-app-api.casetify.cn, m.topsports.com.cn, wxmall.topsports.com.cn, appapi.lvcchong.com, personal-act.wps.cn, csc-service.sgcc.com.cn, www.nodeseek.com, api-cs.intsig.net, pan.baidu.com, cn-wxmall.dreame.tech
+hostname = popvip.paquapp.com, api.tuhu.cn, superapp-public.kiwa-tech.com, media.meituan.com, member-center.miniso.com, a.china-smartech.com, gw2c-hw-open.longfor.com, xapi.weimob.com, scrm-b.zjian.net, sgi.teld.cc, api.weibo.cn, bbs-api.miyoushe.com, pbaccess.video.qq.com, app.mixcapp.com, shop-api.retail.mi.com, m.xiaomiyoupin.com, user-api-prd-mx.wandafilm.com, u6.y.qq.com, discount.wxpapp.wechatpay.cn, mini-app-api.casetify.cn, m.topsports.com.cn, wxmall.topsports.com.cn, appapi.lvcchong.com, personal-act.wps.cn, csc-service.sgcc.com.cn, www.nodeseek.com, api-cs.intsig.net, pan.baidu.com, cn-wxmall.dreame.tech, cn-yx-wxmall.dreame.tech
 
 [Script]
 # WPS(App)
 http-request ^https:\/\/personal-act\.wps\.cn\/activity-rubik\/activity\/page_info tag=WPS Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/wps/wps.cookie.js, requires-body=false, enable={wps}
-cron "0 10 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/wps/wps.js, tag=WPS签到, enable={wps}
+cron "5 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/wps/wps.js, tag=WPS签到, enable={wps}
 
 # 网上国网(App)
 http-request ^https?:\/\/csc-service\.sgcc\.com\.cn:28630\/.+\/member\/ tag=网上国网 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/sgcc/sgcc.cookie.js, requires-body=true, enable={sgcc}
-cron "30 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/sgcc/sgcc.js, tag=网上国网签到, enable={sgcc}
+cron "10 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/sgcc/sgcc.js, tag=网上国网签到, enable={sgcc}
 
 # NodeSeek
 http-request ^https://www\.nodeseek\.com/ tag=NodeSeek Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/nodeseek/nodeseek.cookie.js, requires-body=false, enable={nodeseek}
-cron "0 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/nodeseek/nodeseek.js, tag=NodeSeek签到, enable={nodeseek}
+cron "15 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/nodeseek/nodeseek.js, tag=NodeSeek签到, enable={nodeseek}
 
 # 扫描全能王(App)
 http-request ^https:\/\/api-cs\.intsig\.net\/user\/cs\/get_user_attribute tag=扫描全能王 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/camscanner/camscanner.cookie.js, requires-body=false, enable={camscanner}
-cron "15 10 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/camscanner/camscanner.js, tag=扫描全能王签到, enable={camscanner}
+cron "20 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/camscanner/camscanner.js, tag=扫描全能王签到, enable={camscanner}
 
 # 百度网盘(App)
 http-request ^https:\/\/pan\.baidu\.com\/coins\/taskcenter\/signinlist tag=百度网盘 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/baidunetdisk/baidunetdisk.js, requires-body=false, enable={baidunetdisk}
-cron "15 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/baidunetdisk/baidunetdisk.js, tag=百度网盘签到, enable={baidunetdisk}
+cron "25 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/baidunetdisk/baidunetdisk.js, tag=百度网盘签到, enable={baidunetdisk}
 
 # 追觅签到
 http-request ^https:\/\/cn-wxmall\.dreame\.tech\/main\/ tag=追觅 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, requires-body=true, enable={dreame}
-cron "33 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, tag=追觅签到, enable={dreame}
+cron "30 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/dreame/dreame.js, tag=追觅签到, enable={dreame}
+
+# 灵狐灵购
+http-request ^https:\/\/cn-yx-wxmall\.dreame\.tech\/main\/my\/info tag=灵狐灵购 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/linghu/linghu.js, requires-body=true, enable={linghu}
+cron "35 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/linghu/linghu.js, tag=灵狐灵购签到, enable={linghu}
 
 # 泡泡玛特
 http-response ^https:\/\/popvip\.paquapp\.com\/miniapp\/v2\/(svip_lite\/user_info|wechat_message\/template_info) tag=泡泡玛特 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/ppmt/ppmt.js, requires-body=true, enable={ppmt}
-cron "0 9 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/ppmt/ppmt.js, tag=泡泡玛特签到, enable={ppmt}
+cron "40 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/ppmt/ppmt.js, tag=泡泡玛特签到, enable={ppmt}
 
 # 途虎养车
 http-request ^https:\/\/api\.tuhu\.cn\/User\/(GetMemberSignInInfoAsync|GetRightsList) tag=途虎养车 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/tuhu/tuhu.js, requires-body=false, enable={tuhu}
-cron "0 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/tuhu/tuhu.js, tag=途虎养车签到, enable={tuhu}
+cron "45 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/tuhu/tuhu.js, tag=途虎养车签到, enable={tuhu}
 
 # 海底捞
 http-request ^https:\/\/superapp-public\.kiwa-tech\.com\/activity\/wxapp\/signin\/(query|querySite|querySwitch|queryFragment|signin) tag=海底捞 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/haidilao/haidilao.js, requires-body=false, enable={haidilao}
-cron "10 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/haidilao/haidilao.js, tag=海底捞签到, enable={haidilao}
+cron "50 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/haidilao/haidilao.js, tag=海底捞签到, enable={haidilao}
 
 # 惠省红包墙
 http-request ^https:\/\/media\.meituan\.com\/fulishemini\/couponActivity\/listActivityCoupon tag=惠省红包墙 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/huisheng/huisheng.cookie.js, requires-body=true, enable={huisheng}
-cron "20 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/huisheng/huisheng.js, tag=惠省红包墙签到, enable={huisheng}
+cron "55 0 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/huisheng/huisheng.js, tag=惠省红包墙签到, enable={huisheng}
 
 # 名创优品
 http-request ^https:\/\/member-center\.miniso\.com\/userinfo\/userinfo\/GetUserInfoV3 tag=名创优品 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/miniso/miniso.js, requires-body=false, enable={miniso}
-cron "30 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/miniso/miniso.js, tag=名创优品签到, enable={miniso}
+cron "20 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/miniso/miniso.js, tag=名创优品签到, enable={miniso}
 
 # 龙德广场
 http-request ^https:\/\/a\.china-smartech\.com\/restful\/mall\/\d+\/checkInForm tag=龙德广场 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/longde/longde.js, requires-body=false, enable={longde}
-cron "5 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/longde/longde.js, tag=龙德广场签到, enable={longde}
+cron "25 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/longde/longde.js, tag=龙德广场签到, enable={longde}
 
 # 龙湖天街(小程序)
 http-request ^https:\/\/gw2c-hw-open\.longfor\.com\/lmarketing-task-api-mvc-prod\/openapi\/task\/v1\/signature\/clock$ tag=龙湖天街 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/lhtj/lhtj.js, requires-body=false, enable={lhtj}
-cron "40 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/lhtj/lhtj.js, tag=龙湖天街签到, enable={lhtj}
+cron "30 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/lhtj/lhtj.js, tag=龙湖天街签到, enable={lhtj}
 
 # 松山棉店
 http-request ^https:\/\/xapi\.weimob\.com\/api3\/onecrm\/mactivity\/sign\/misc\/sign\/activity\/(c\/signMainInfo|core\/c\/(getActivityInfo|sign)) tag=松山棉店 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/songshan/songshan.js, requires-body=true, enable={songshan}
-cron "45 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/songshan/songshan.js, tag=松山棉店签到, enable={songshan}
+cron "35 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/songshan/songshan.js, tag=松山棉店签到, enable={songshan}
 
 # 味多美
 http-response ^https:\/\/scrm-b\.zjian\.net\/api\/member\/(minaLogin|find) tag=味多美 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/wedome/wedome.js, requires-body=true, enable={wedome}
-cron "50 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/wedome/wedome.js, tag=味多美签到, enable={wedome}
+cron "40 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/wedome/wedome.js, tag=味多美签到, enable={wedome}
 
 # 特来电
 http-request ^https:\/\/sgi\.teld\.cc\/api\/invoke tag=特来电 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/teld/teld.js, requires-body=false, enable={teld}
-cron "55 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/teld/teld.js, tag=特来电签到, enable={teld}
+cron "45 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/teld/teld.js, tag=特来电签到, enable={teld}
 
 # 北京华联
 http-request ^https:\/\/a\.china-smartech\.com\/restful\/mall\/\d+\/checkInForm tag=北京华联 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/bhg/bhg.js, requires-body=false, enable={bhg}
-cron "8 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/bhg/bhg.js, tag=北京华联签到, enable={bhg}
+cron "50 8 * * *" script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/miniprogram/bhg/bhg.js, tag=北京华联签到, enable={bhg}
 
 # 微博超话
 http-request ^https:\/\/api\.weibo\.cn\/2\/(statuses\/container_timeline_topicsub|page\/button) tag=微博超话 Cookie, script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/weibotalk/weibotalk.cookie.js, requires-body=true, enable={weibotalk}
