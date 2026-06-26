@@ -1,30 +1,38 @@
 /*
- * 【彩票查询】完整优化版 v1.5
+ * 【彩票查询】完整修复版 v1.6
  * 修复内容：
- * 1. 放弃被全面拦截的官方接口，切换为更稳健的聚合 API 数据源。
- * 2. 完善异常处理，增加空数据判断。
+ * 1. 修复了 HTTP 回调响应为空（null）导致的脚本崩溃。
+ * 2. 完善了网络异常的日志打印。
  */
 
 const $ = new API("ssq", true);
 
 !(async () => {
-    $.log("=== 脚本开始运行 [v1.5] ===");
-    await checkData();
+    $.log("=== 脚本开始运行 [v1.6] ===");
+    try {
+        await checkData();
+    } catch (e) {
+        $.log("【全局运行错误】: " + e.message);
+    }
     $.log("=== 脚本执行结束 ===");
 })().finally(() => $.done());
 
 async function checkData() {
     try {
-        // 使用一个通用的聚合接口（该接口对自动化请求相对友好）
+        // 使用一个通用的聚合接口
         const url = `https://api.667.ee/lotto/latest`; 
         const resp = await $.http.get({ url });
         
-        if (!resp.body) throw new Error("接口返回为空");
+        // 增加响应数据检查
+        if (!resp || !resp.body) {
+            throw new Error("接口返回响应为空或网络连接超时");
+        }
         
         const json = JSON.parse(resp.body);
-        if (json.code !== 200) throw new Error("数据源获取失败: " + json.msg);
+        if (json.code !== 200) {
+            throw new Error("数据源获取失败: " + (json.msg || "未知错误"));
+        }
 
-        // 格式化输出
         const { ssq, dlt } = json.data;
         $.notify("彩票查询", "双色球", `开奖号码: ${ssq.nums}\n奖池: ${ssq.pool}万`);
         $.notify("彩票查询", "大乐透", `开奖号码: ${dlt.nums}\n奖池: ${dlt.pool}万`);
@@ -35,7 +43,7 @@ async function checkData() {
 }
 
 // ------------------------------
-// 类库基础框架
+// 类库基础框架 (v1.6)
 // ------------------------------
 function API(name, debug) {
     return new (class {
@@ -46,8 +54,21 @@ function API(name, debug) {
         get http() {
             return {
                 get: (options) => new Promise((res) => {
-                    if (typeof $task !== 'undefined') $task.fetch(options).then(res);
-                    else if (typeof $httpClient !== 'undefined') $httpClient.get(options, (e, r, b) => res({statusCode: r.status, body: b}));
+                    if (typeof $task !== 'undefined') {
+                        $task.fetch(options).then(res).catch(e => {
+                            console.log(`[HTTP错误] ${e}`);
+                            res({statusCode: 500, body: null});
+                        });
+                    } else if (typeof $httpClient !== 'undefined') {
+                        $httpClient.get(options, (e, r, b) => {
+                            if (e) {
+                                console.log(`[HTTP错误] ${e}`);
+                                res({statusCode: 500, body: null});
+                            } else {
+                                res({statusCode: r.status, body: b});
+                            }
+                        });
+                    }
                 })
             };
         }
